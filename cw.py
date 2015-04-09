@@ -32,7 +32,7 @@ floatX = theano.config.floatX
 n_u = 225 # input vector size (not time at this point)
 n_y = n_u # output vector size
 n_seq = 200 # number of sequences for training
-iteration = 2 # number of epochs of gradient descent
+iteration = 50 # number of epochs of gradient descent
 lr = 0.02 # learning rate
 module = 5
 unit = 100
@@ -41,9 +41,11 @@ periods = np.array([1,2,4,8,16], dtype = floatX)
 print "Building Model"
 # Symbolic variables
 x = tensor.tensor3('x', dtype=floatX)
+one_x = tensor.matrix('one_x', dtype=floatX)
 target = tensor.tensor3('target', dtype=floatX)
 time = tensor.vector('time', dtype='int16')
 one_time = tensor.wscalar('one_time')
+h_initial = tensor.matrix('h_initial', dtype=floatX)
 
 # Build the model
 
@@ -53,8 +55,7 @@ h = clockwork.apply(x, time)
 predict = Sigmoid().apply(linear.apply(h))
 
 # only for generation B x h_dim
-h_initial = tensor.tensor3('h_initial', dtype=floatX)
-h_testing = clockwork.apply(x, one_time, states=h_initial, iterate=False)
+h_testing = clockwork.apply(inputs=one_x, time=one_time, states=h_initial, iterate=False)
 y_hat_testing = Sigmoid().apply(linear.apply(h_testing))
 y_hat_testing.name = 'y_hat_testing'
 
@@ -105,10 +106,9 @@ main_loop = MainLoop(data_stream=stream, algorithm=algorithm, extensions=[monito
 print 'Starting training ...'
 main_loop.run()
 
-
-
 generate1 = theano.function([x, time], [predict, h])
-generate2 = theano.function([x, one_time, h_initial], [y_hat_testing, h_testing])
+generate2 = theano.function([one_x, one_time, h_initial], [y_hat_testing, h_testing])
+
 initial_seq = inputs[0, :20, 0:1, :]
 current_output, current_hidden = generate1(initial_seq, time_val[0,:20])
 current_output, current_hidden = current_output[-1:], current_hidden[-1:]
@@ -116,6 +116,9 @@ generated_seq = initial_seq[:, 0]
 next_input = current_output
 prev_state = current_hidden
 
+
+next_input = next_input[0]
+prev_state = prev_state[0]
 
 print np.shape(next_input)
 print np.shape(prev_state)
@@ -125,7 +128,8 @@ for i in range(200):
     current_output, current_hidden = generate2(next_input, i, prev_state)
     next_input = current_output
     prev_state = current_hidden
-    generated_seq = np.vstack((generated_seq, current_output[:, 0]))
+    generated_seq = np.vstack((generated_seq, current_output))
+
 print generated_seq.shape
 save_as_gif(generated_seq.reshape(generated_seq.shape[0],
                                   np.sqrt(generated_seq.shape[1]),
