@@ -13,7 +13,7 @@ from blocks.bricks import Linear, Sigmoid
 from blocks.bricks.recurrent import  ClockWork
 from blocks.graph import ComputationGraph
 from blocks.bricks.cost import SquaredError
-from blocks.algorithms import GradientDescent, Scale
+from blocks.algorithms import GradientDescent, Scale, CompositeRule, StepClipping
 from blocks.extensions import FinishAfter, Printing
 from blocks.extensions.monitoring import TrainingDataMonitoring
 from blocks.main_loop import MainLoop
@@ -31,12 +31,11 @@ floatX = theano.config.floatX
 # Parameters
 n_u = 225 # input vector size (not time at this point)
 n_y = n_u # output vector size
-n_seq = 200 # number of sequences for training
-iteration = 50 # number of epochs of gradient descent
-lr = 0.02 # learning rate
-module = 5
-unit = 100
-periods = np.array([1,2,4,8,16], dtype = floatX)
+
+iteration = 400 # number of epochs of gradient descent
+module = 3
+unit = 150
+periods = np.array([1,2,4], dtype = floatX)
 
 print "Building Model"
 # Symbolic variables
@@ -72,7 +71,7 @@ cg = ComputationGraph(cost)
 print(VariableFilter(roles=[WEIGHT, BIAS])(cg.variables))
 
 # Training process
-algorithm = GradientDescent(cost=cost, params=cg.parameters, step_rule=Scale(lr))
+algorithm = GradientDescent(cost=cost, params=cg.parameters, step_rule=CompositeRule([StepClipping(10.0),Scale(4)])) 
 monitor_cost = TrainingDataMonitoring([cost], prefix="train", after_epoch=True)
 
 print "Model built"
@@ -133,5 +132,5 @@ for i in range(200):
 print generated_seq.shape
 save_as_gif(generated_seq.reshape(generated_seq.shape[0],
                                   np.sqrt(generated_seq.shape[1]),
-                                  np.sqrt(generated_seq.shape[1])))
+                                  np.sqrt(generated_seq.shape[1])), path="results/cw3_150_400.gif")
                                   
