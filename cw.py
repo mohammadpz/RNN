@@ -24,41 +24,45 @@ from blocks.roles import WEIGHT, BIAS
 from fuel.datasets import IterableDataset
 from fuel.streams import DataStream
 
+from datasets import single_bouncing_ball, save_as_gif
 
 floatX = theano.config.floatX
 
 # Parameters
-n_u = 3 # input vector size (not time at this point)
-n_y = 3 # output vector size
-n_h = 20 # numer of hidden units
-time_steps = 50 # number of time-steps in time
+n_u = 225 # input vector size (not time at this point)
+n_y = n_u # output vector size
 n_seq = 200 # number of sequences for training
-iteration = 500 # number of epochs of gradient descent
-lr = 0.01 # learning rate
-module = 4
-unit = 10
-periods = np.array([1,2,4,8], dtype = floatX)
+iteration = 2 # number of epochs of gradient descent
+lr = 0.02 # learning rate
+module = 5
+unit = 100
+periods = np.array([1,2,4,8,16], dtype = floatX)
 
 print "Building Model"
 # Symbolic variables
 x = tensor.tensor3('x', dtype=floatX)
 target = tensor.tensor3('target', dtype=floatX)
 time = tensor.vector('time', dtype='int16')
+one_time = tensor.wscalar('one_time')
 
 # Build the model
-linear = Linear(input_dim = n_u, output_dim = unit * module, name="first_layer")
 
-clockwork = ClockWork(module=module, periods=periods, unit=unit, activation=Sigmoid())
+clockwork = ClockWork(input_dim=n_u, module=module, periods=periods, unit=unit, activation=Sigmoid(), name="clockwork rnn")
+linear = Linear(input_dim = unit * module, output_dim = n_y, name="output_layer")
+h = clockwork.apply(x, time)
+predict = Sigmoid().apply(linear.apply(h))
 
-linear2 = Linear(input_dim = unit * module, output_dim = n_y, name="output_layer")
-
-predict = Sigmoid().apply(linear2.apply(clockwork.apply(time, linear.apply(x))))
+# only for generation B x h_dim
+h_initial = tensor.tensor3('h_initial', dtype=floatX)
+h_testing = clockwork.apply(x, one_time, states=h_initial, iterate=False)
+y_hat_testing = Sigmoid().apply(linear.apply(h_testing))
+y_hat_testing.name = 'y_hat_testing'
 
 # Cost function
 cost = SquaredError().apply(predict,target)
 
 # Initialization
-for brick in (clockwork, linear, linear2):
+for brick in (clockwork, linear):
     brick.weights_init = initialization.IsotropicGaussian(0.01)
     brick.biases_init = initialization.Constant(0)
     brick.initialize()
@@ -77,25 +81,53 @@ print "Model built"
 ############
 
 
-#Build input and output
-seq = np.random.randn(1,time_steps, n_seq, n_u)
-seq = seq.astype(floatX, copy=False)
+# Build input and output
 
-targets = np.zeros((1,time_steps, n_seq, n_y), dtype = floatX)
-targets[:,1:, :, 0] = seq[:,:-1, :, 0] # 1 time-step delay between input and output
-targets[:,2:, :, 1] = seq[:,:-2, :, 1] # 2 time-step delay
-targets[:,3:, :, 2] = seq[:,:-3, :, 2] # 3 time-step delay
-targets += 0.01 * np.random.standard_normal(targets.shape)
+inputs = single_bouncing_ball(10,10,200,15,2)
 
-time = np.arange(time_steps).reshape(1,time_steps)
-time = time.astype(np.int16)
+outputs = np.zeros(inputs.shape, dtype = floatX)
+outputs[:, 0:-1, :, :] = inputs[:, 1:, :, :]
+time_val = np.zeros((10,200), dtype = np.int16)
+for i in range(10):
+    for j in range(200):
+        time_val[i,j] = j
+print time_val.dtype
+print inputs.dtype
+print outputs.dtype
 
-dataset = IterableDataset({'x': seq, 'time': time, 'target': targets})
+print 'Bulding DataStream ...'
+dataset = IterableDataset({'x': inputs, 'time': time_val, 'target': outputs})
 stream = DataStream(dataset)
-
 
 model = Model(cost)
 main_loop = MainLoop(data_stream=stream, algorithm=algorithm, extensions=[monitor_cost, FinishAfter(after_n_epochs=iteration), Printing()], model=model)
 
 print 'Starting training ...'
 main_loop.run()
+
+
+
+generate1 = theano.function([x, time], [predict, h])
+generate2 = theano.function([x, one_time, h_initial], [y_hat_testing, h_testing])
+initial_seq = inputs[0, :20, 0:1, :]
+current_output, current_hidden = generate1(initial_seq, time_val[0,:20])
+current_output, current_hidden = current_output[-1:], current_hidden[-1:]
+generated_seq = initial_seq[:, 0]
+next_input = current_output
+prev_state = current_hidden
+
+
+print np.shape(next_input)
+print np.shape(prev_state)
+
+
+for i in range(200):
+    current_output, current_hidden = generate2(next_input, i, prev_state)
+    next_input = current_output
+    prev_state = current_hidden
+    generated_seq = np.vstack((generated_seq, current_output[:, 0]))
+print generated_seq.shape
+save_as_gif(generated_seq.reshape(generated_seq.shape[0],
+                                  np.sqrt(generated_seq.shape[1]),
+                                  np.sqrt(generated_seq.shape[1])))
+                                  
