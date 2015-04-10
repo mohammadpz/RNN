@@ -37,7 +37,7 @@ n_u = 1 # input vector size (not time at this point)
 n_y = 1 # output vector size
 n_h = 50 # numer of hidden units
 
-iteration = 200 # number of epochs of gradient descent
+iteration = 300 # number of epochs of gradient descent
 
 print "Building Model"
 # Symbolic variables
@@ -77,7 +77,7 @@ cg = ComputationGraph(cost)
 print(VariableFilter(roles=[WEIGHT, BIAS])(cg.variables))
 
 # Training process
-algorithm = GradientDescent(cost=cost, params=cg.parameters, step_rule=CompositeRule([RMSProp(learning_rate=0.001, decay_rate=0.95, max_scaling=1e5), BasicMomentum(0.9)]))
+algorithm = GradientDescent(cost=cost, params=cg.parameters, step_rule=CompositeRule([RMSProp(learning_rate=0.0005, decay_rate=0.95, max_scaling=1e5), BasicMomentum(0.9)]))
 monitor_cost = TrainingDataMonitoring([cost], prefix="train", after_epoch=True)
 
 print "Model built"
@@ -135,4 +135,6 @@ for i in range(200):
 print np.shape(generated_seq)
 
 plt.plot(lin_time, generated_seq.reshape((generated_seq.shape[0],1)))
+
+plt.show()
                                   

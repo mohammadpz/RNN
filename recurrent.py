@@ -638,26 +638,24 @@ class ClockWork(BaseRecurrent, Initializable):
         return super(ClockWork, self).get_dim(name)
 
     def _allocate(self):
-        self.Wh = {}
-        self.Wi = {}
-        for i in range(self.module):
-            self.Wh[i] = {}
-            for j in range(i, self.module):
-                self.Wh[i][j] = shared_floatx_nans((self.unit, self.unit), name='Wh'+str(i)+'_'+str(j))
-                self.params.append(self.Wh[i][j])
-                add_role(self.Wh[i][j], WEIGHT)
-
-
-            self.Wi[i] = shared_floatx_nans((self.input_dim, self.unit), name='Wi'+str(i))
-            self.params.append(self.Wi[i])
-            add_role(self.Wi[i], WEIGHT)
-                
+        self.Wh = shared_floatx_nans((self.dim, self.dim), name='Wh')
+        self.Wi = shared_floatx_nans((self.input_dim, self.dim), name='Wi')
+        self.b = shared_floatx_nans((1,self.dim), name='b')
         
+        self.params.append(self.Wi)
+        self.params.append(self.Wh)
+        self.params.append(self.b)
+        
+        add_role(self.Wi, WEIGHT)
+        add_role(self.Wh, WEIGHT)
+        add_role(self.b, BIAS)
+
+
+    #triangular matrix !
     def _initialize(self):
-        for i in range(self.module):
-            for j in range(i, self.module):
-                self.weights_init.initialize(self.Wh[str(i)+'_'+str(j)], self.rng)
-            self.weights_init.initialize(self.Wi[i], self.rng)
+        self.weights_init.initialize(self.Wh, self.rng)
+        self.weights_init.initialize(self.Wi, self.rng)
+        self.weights_init.initialize(self.b, self.rng)
 
 
     @recurrent(sequences=['inputs', 'time', 'mask'], states=['states'],
@@ -670,35 +668,31 @@ class ClockWork(BaseRecurrent, Initializable):
         inputs : :class:`~tensor.TensorVariable`
             The 2D inputs, in the shape (batch, input_dim).
             
-        time :  :class:`~tensor.Tensor`
+        time :
             The time index of the sequence the module gets as input.
             
         states : :class:`~tensor.TensorVariable`
-            The 2D states, in the shape (batch, features).
+            The 2D states, in the shape (batch, dim).
         """
-
-        def compute(i, period, Wi_i, Wh_i, dim, unit, module):
-            W_temp_i = tensor.alloc(0, dim, unit)        
-            for j in range(i, module):
-                W_temp_i = tensor.set_subtensor(W_temp_i[unit * j : unit * (j + 1),:], Wh_i[j])
-            
-            slice_i = ifelse(tensor.eq(time % period, 0.0), tensor.dot(inputs, Wi_i) + tensor.dot(states, W_temp_i), states[:,i*unit:(i+1)*unit])
-            return slice_i
-            
-        next_states_slices,_ = theano.scan(compute,
-                                    sequences = [tensor.arange(self.module), self.periods, self.Wi, self.Wh],
-                                    non_sequences=[ self.unit * self.module, self.unit, self.module])
         
+        actual_Wi = tensor.zeros((self.input_dim, self.dim))
+        actual_Wh = tensor.zeros((self.dim, self.dim))
+        actual_b = tensor.zeros((1, self.dim))
         
-        def concatenate(i, slice_i, next_states_partial, unit):
-            return tensor.set_subtensor(next_states_partial[:, unit * i : unit * (i + 1)],slice_i)    
-            
-        next_states,_ = theano.scan(concatenate,
-                                    sequences=[tensor.arange(self.module),next_states_slices],
-                                    outputs_info=[tensor.zeros_like(states)],
-                                    non_sequences=[self.unit])
+        for i in range(self.module):
+            actual_Wi, actual_Wh, actual_b = ifelse(tensor.eq(time % self.periods[i], 0.0),
+                                                   [tensor.set_subtensor(actual_Wi[:,i*self.unit:(i+1)*self.unit], self.Wi[:,i*self.unit:(i+1)*self.unit]),
+                                                   tensor.set_subtensor(actual_Wh[i*self.unit:,i*self.unit:(i+1)*self.unit], self.Wh[i*self.unit:,i*self.unit:(i+1)*self.unit]),
+                                                   tensor.set_subtensor(actual_b[:,i*self.unit:(i+1)*self.unit], self.b[:,i*self.unit:(i+1)*self.unit])
+                                                   ],
+                                                   [actual_Wi, actual_Wh, actual_b]
+                                                   )
         
-        next_states = next_states[-1]
+        batch = tensor.shape(states)[0]
+        one = tensor.ones((batch, 1))
+        actual_b = tensor.dot(one, actual_b)
+        
+        next_states = tensor.dot(inputs, actual_Wi) + tensor.dot(states, actual_Wh) + actual_b
         next_states = self.children[0].apply(next_states)
 
         if mask:

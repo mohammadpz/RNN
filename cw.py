@@ -32,7 +32,7 @@ floatX = theano.config.floatX
 n_u = 225 # input vector size (not time at this point)
 n_y = n_u # output vector size
 
-iteration = 550 # number of epochs of gradient descent
+iteration = 300 # number of epochs of gradient descent
 module = 3
 unit = 20
 periods = np.array([1,2,4], dtype = floatX)
@@ -54,7 +54,7 @@ h = clockwork.apply(x, time)
 predict = Sigmoid().apply(linear.apply(h))
 
 # only for generation B x h_dim
-h_testing = clockwork.apply(inputs=one_x, time=one_time, states=h_initial, iterate=False)
+h_testing = clockwork.apply(one_x, one_time, h_initial, iterate=False)
 y_hat_testing = Sigmoid().apply(linear.apply(h_testing))
 y_hat_testing.name = 'y_hat_testing'
 
@@ -63,7 +63,7 @@ cost = SquaredError().apply(predict,target)
 
 # Initialization
 for brick in (clockwork, linear):
-    brick.weights_init = initialization.IsotropicGaussian(0.01)
+    brick.weights_init = initialization.IsotropicGaussian(0.1)
     brick.biases_init = initialization.Constant(0)
     brick.initialize()
 
@@ -112,12 +112,9 @@ initial_seq = inputs[0, :20, 0:1, :]
 current_output, current_hidden = generate1(initial_seq, time_val[0,:20])
 current_output, current_hidden = current_output[-1:], current_hidden[-1:]
 generated_seq = initial_seq[:, 0]
-next_input = current_output
-prev_state = current_hidden
+next_input = current_output[0]
+prev_state = current_hidden[0]
 
-
-next_input = next_input[0]
-prev_state = prev_state[0]
 
 print np.shape(next_input)
 print np.shape(prev_state)

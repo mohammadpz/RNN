@@ -35,7 +35,7 @@ n_u = 225 # input vector size (not time at this point)
 n_y = 225 # output vector size
 n_h = 500 # numer of hidden units
 
-iteration = 200 # number of epochs of gradient descent
+iteration = 300 # number of epochs of gradient descent
 
 print "Building Model"
 # Symbolic variables
@@ -66,7 +66,7 @@ cost = SquaredError().apply(predict,target)
 
 # Initialization
 for brick in (rnn, linear, linear2):
-    brick.weights_init = initialization.IsotropicGaussian(0.01)
+    brick.weights_init = initialization.IsotropicGaussian(0.1)
     brick.biases_init = initialization.Constant(0)
     brick.initialize()
 
@@ -130,5 +130,5 @@ for i in range(200):
 print generated_seq.shape
 save_as_gif(generated_seq.reshape(generated_seq.shape[0],
                                   np.sqrt(generated_seq.shape[1]),
-                                  np.sqrt(generated_seq.shape[1])), "results/vanilla2.gif")
+                                  np.sqrt(generated_seq.shape[1])), path="results/vanilla300_500.gif")
                                   

@@ -66,11 +66,13 @@ def single_bouncing_ball(num_batches, batch_size,
     
 def random_noise(num_batches, batch_size, num_frames):
     num_frames_total = num_batches * batch_size * num_frames
-    random_walk = numpy.zeros((num_frames_total), dtype=numpy.float32)
-    for i in range(1,num_frames_total):
-        random_walk[i] = random_walk[i-1] + numpy.random.randn()
+
+    random_walk = numpy.zeros((num_batches * batch_size , num_frames), dtype=numpy.float32)
+    
+    for i in range(num_batches * batch_size):
+        for j in range(num_frames):
+            random_walk[i,j] = numpy.random.rand()
         
-    random_walk = random_walk.reshape((num_batches * batch_size, num_frames))
     random_walk[1:] = random_walk[numpy.random.permutation(random_walk.shape[0] - 1) + 1]
     
     random_walk = random_walk.reshape((num_batches, batch_size, num_frames, 1))
@@ -83,7 +85,7 @@ def sine_wave(num_batches, batch_size, num_frames):
     num_frames_total = num_batches * batch_size * num_frames
     sine_wave = numpy.zeros((num_frames_total), dtype=numpy.float32)
     for i in range(0,num_frames_total):
-        sine_wave[i] = numpy.sin(2*numpy.pi * i / 30.0) -1
+        sine_wave[i] = 0.5 * numpy.sin(2*numpy.pi * i / 30.0) + 0.5
         
     sine_wave = sine_wave.reshape((num_batches * batch_size, num_frames))
     sine_wave[1:] = sine_wave[numpy.random.permutation(sine_wave.shape[0] - 1) + 1]

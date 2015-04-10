@@ -34,9 +34,9 @@ floatX = theano.config.floatX
 n_u = 1 # input vector size (not time at this point)
 n_y = n_u # output vector size
 
-iteration = 100 # number of epochs of gradient descent
+iteration = 200 # number of epochs of gradient descent
 module = 3
-unit = 6
+unit = 30
 periods = np.array([1,2,4], dtype = floatX)
 
 print "Building Model"
@@ -73,7 +73,7 @@ cg = ComputationGraph(cost)
 print(VariableFilter(roles=[WEIGHT, BIAS])(cg.variables))
 
 # Training process
-algorithm = GradientDescent(cost=cost, params=cg.parameters, step_rule=CompositeRule([RMSProp(learning_rate=0.001, decay_rate=0.95, max_scaling=1e5), BasicMomentum(0.9)])) 
+algorithm = GradientDescent(cost=cost, params=cg.parameters, step_rule=CompositeRule([RMSProp(learning_rate=0.0001, decay_rate=0.95, max_scaling=1e5), BasicMomentum(0.9)])) 
 monitor_cost = TrainingDataMonitoring([cost], prefix="train", after_epoch=True)
 
 print "Model built"
@@ -140,5 +140,6 @@ for i in range(200):
 
 print generated_seq.shape
 plt.plot(lin_time, generated_seq.reshape((generated_seq.shape[0],1)))
+plt.show()
                                   
 
