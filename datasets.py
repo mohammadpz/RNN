@@ -24,8 +24,7 @@ def single_bouncing_ball(num_batches, batch_size,
     tempresolution = 50.
     num_frames_total = num_batches * batch_size * num_frames
     print 'Making data...'
-    imgrid = numpy.array(numpy.meshgrid(numpy.arange(0, patch_size),
-                         numpy.arange(0, patch_size)))
+    imgrid = numpy.array(numpy.meshgrid(numpy.arange(0, patch_size), numpy.arange(0, patch_size)))
     pos_x = numpy.tile(numpy.concatenate((
         numpy.linspace(ball_size - 1, patch_size - ball_size,
                        tempresolution - 1, endpoint=False),
@@ -64,3 +63,33 @@ def single_bouncing_ball(num_batches, batch_size,
     print "(S, T, B, F) : " + str(train_features_numpy.shape)
     print
     return train_features_numpy
+    
+def random_noise(num_batches, batch_size, num_frames):
+    num_frames_total = num_batches * batch_size * num_frames
+    random_walk = numpy.zeros((num_frames_total), dtype=numpy.float32)
+    for i in range(1,num_frames_total):
+        random_walk[i] = random_walk[i-1] + numpy.random.randn()
+        
+    random_walk = random_walk.reshape((num_batches * batch_size, num_frames))
+    random_walk[1:] = random_walk[numpy.random.permutation(random_walk.shape[0] - 1) + 1]
+    
+    random_walk = random_walk.reshape((num_batches, batch_size, num_frames, 1))
+    
+    random_walk = numpy.swapaxes(random_walk, 1, 2)
+    
+    return random_walk
+        
+def sine_wave(num_batches, batch_size, num_frames):
+    num_frames_total = num_batches * batch_size * num_frames
+    sine_wave = numpy.zeros((num_frames_total), dtype=numpy.float32)
+    for i in range(0,num_frames_total):
+        sine_wave[i] = numpy.sin(2*numpy.pi * i / 30.0) -1
+        
+    sine_wave = sine_wave.reshape((num_batches * batch_size, num_frames))
+    sine_wave[1:] = sine_wave[numpy.random.permutation(sine_wave.shape[0] - 1) + 1]
+    
+    sine_wave = sine_wave.reshape((num_batches, batch_size, num_frames, 1))
+    
+    sine_wave = numpy.swapaxes(sine_wave, 1, 2)
+    
+    return sine_wave

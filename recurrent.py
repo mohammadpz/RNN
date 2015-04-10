@@ -3,7 +3,6 @@ import copy
 import inspect
 import logging
 from functools import wraps
-import numpy
 
 from picklable_itertools.extras import equizip
 import theano
@@ -591,7 +590,7 @@ class GatedRecurrent(BaseRecurrent, Initializable):
 class ClockWork(BaseRecurrent, Initializable):
     u"""A Clockwork Module, elementary brick to build the Clockwork RNN.
 
-   TODO: description
+   TODO: correct description
 
     Parameters
     ----------
@@ -632,6 +631,8 @@ class ClockWork(BaseRecurrent, Initializable):
         self.children = [activation]
         
     def get_dim(self, name):
+        if name == 'mask':
+            return 0
         if name in self.apply.sequences + self.apply.states:
             return self.unit * self.module
         return super(ClockWork, self).get_dim(name)
@@ -640,10 +641,11 @@ class ClockWork(BaseRecurrent, Initializable):
         self.Wh = {}
         self.Wi = {}
         for i in range(self.module):
+            self.Wh[i] = {}
             for j in range(i, self.module):
-                self.Wh[str(i)+'_'+str(j)] = shared_floatx_nans((self.unit, self.unit), name='Wh'+str(i)+'_'+str(j))
-                self.params.append(self.Wh[str(i)+'_'+str(j)])
-                add_role(self.Wh[str(i)+'_'+str(j)], WEIGHT)
+                self.Wh[i][j] = shared_floatx_nans((self.unit, self.unit), name='Wh'+str(i)+'_'+str(j))
+                self.params.append(self.Wh[i][j])
+                add_role(self.Wh[i][j], WEIGHT)
 
 
             self.Wi[i] = shared_floatx_nans((self.input_dim, self.unit), name='Wi'+str(i))
@@ -658,9 +660,9 @@ class ClockWork(BaseRecurrent, Initializable):
             self.weights_init.initialize(self.Wi[i], self.rng)
 
 
-    @recurrent(sequences=['inputs', 'time'], states=['states'],
+    @recurrent(sequences=['inputs', 'time', 'mask'], states=['states'],
                outputs=['states'], contexts=[])
-    def apply(self, inputs=None, time=None, states=None):
+    def apply(self, inputs=None, time=None, states=None, mask=None):
         """Apply the simple transition.
 
         Parameters
@@ -675,34 +677,34 @@ class ClockWork(BaseRecurrent, Initializable):
             The 2D states, in the shape (batch, features).
         """
 
-        W_temp = {}
-
-        first = True
-        for i in range(self.module):
-            period = self.periods[i]
+        def compute(i, period, Wi_i, Wh_i, dim, unit, module):
+            W_temp_i = tensor.alloc(0, dim, unit)        
+            for j in range(i, module):
+                W_temp_i = tensor.set_subtensor(W_temp_i[unit * j : unit * (j + 1),:], Wh_i[j])
             
-            #creates W_temp[i]
-            W_temp[i] = numpy.zeros((0, self.unit), dtype = theano.config.floatX)
-                
-            for j in range(i):
-                W_temp[i] = tensor.concatenate((W_temp[i],numpy.zeros((self.unit, self.unit), dtype = theano.config.floatX)), axis = 0)
-            for j in range(i, self.module):
-                W_temp[i] = tensor.concatenate((W_temp[i], self.Wh[str(i)+'_'+str(j)]), axis = 0)
+            slice_i = ifelse(tensor.eq(time % period, 0.0), tensor.dot(inputs, Wi_i) + tensor.dot(states, W_temp_i), states[:,i*unit:(i+1)*unit])
+            return slice_i
             
-            update = ifelse(tensor.eq(time % period, 0.0), tensor.dot(inputs, self.Wi[i]) + tensor.dot(states, W_temp[i]) ,states[:,i*self.unit:(i+1)*self.unit])
-            
-            if first:
-                first = False
-                next_states = update
-            
-            else:
-                next_states = tensor.concatenate((next_states, update), axis=1)
-            
-        next_states = self.children[0].apply(next_states)
+        next_states_slices,_ = theano.scan(compute,
+                                    sequences = [tensor.arange(self.module), self.periods, self.Wi, self.Wh],
+                                    non_sequences=[ self.unit * self.module, self.unit, self.module])
         
+        
+        def concatenate(i, slice_i, next_states_partial, unit):
+            return tensor.set_subtensor(next_states_partial[:, unit * i : unit * (i + 1)],slice_i)    
+            
+        next_states,_ = theano.scan(concatenate,
+                                    sequences=[tensor.arange(self.module),next_states_slices],
+                                    outputs_info=[tensor.zeros_like(states)],
+                                    non_sequences=[self.unit])
+        
+        next_states = next_states[-1]
+        next_states = self.children[0].apply(next_states)
+
+        if mask:
+            next_states = (mask[:, None] * next_states + (1 - mask[:, None]) * states)
+
         return next_states
-
-
                     
                     
 class Bidirectional(Initializable):

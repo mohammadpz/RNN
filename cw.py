@@ -10,7 +10,7 @@ from theano import tensor
 
 from blocks import initialization
 from blocks.bricks import Linear, Sigmoid
-from blocks.bricks.recurrent import  ClockWork
+from recurrent import ClockWork
 from blocks.graph import ComputationGraph
 from blocks.bricks.cost import SquaredError
 from blocks.algorithms import GradientDescent, Scale, CompositeRule, StepClipping
@@ -32,9 +32,9 @@ floatX = theano.config.floatX
 n_u = 225 # input vector size (not time at this point)
 n_y = n_u # output vector size
 
-iteration = 400 # number of epochs of gradient descent
+iteration = 550 # number of epochs of gradient descent
 module = 3
-unit = 150
+unit = 20
 periods = np.array([1,2,4], dtype = floatX)
 
 print "Building Model"
@@ -132,5 +132,5 @@ for i in range(200):
 print generated_seq.shape
 save_as_gif(generated_seq.reshape(generated_seq.shape[0],
                                   np.sqrt(generated_seq.shape[1]),
-                                  np.sqrt(generated_seq.shape[1])), path="results/cw3_150_400.gif")
+                                  np.sqrt(generated_seq.shape[1])), path="results/cw3_20_550.gif")
                                   
