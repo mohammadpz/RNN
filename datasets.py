@@ -63,35 +63,38 @@ def single_bouncing_ball(num_batches, batch_size,
     print "(S, T, B, F) : " + str(train_features_numpy.shape)
     print
     return train_features_numpy
-    
-def random_noise(num_batches, batch_size, num_frames):
-    num_frames_total = num_batches * batch_size * num_frames
 
-    random_walk = numpy.zeros((num_batches * batch_size , num_frames), dtype=numpy.float32)
-    
+
+def random_noise(num_batches, batch_size, num_frames):
+    # num_frames_total = num_batches * batch_size * num_frames
+
+    random_walk = numpy.zeros((num_batches * batch_size, num_frames),
+                              dtype=numpy.float32)
+
     for i in range(num_batches * batch_size):
         for j in range(num_frames):
-            random_walk[i,j] = numpy.random.rand()
-        
+            random_walk[i, j] = numpy.random.rand()
+
     random_walk[1:] = random_walk[numpy.random.permutation(random_walk.shape[0] - 1) + 1]
-    
+
     random_walk = random_walk.reshape((num_batches, batch_size, num_frames, 1))
-    
+
     random_walk = numpy.swapaxes(random_walk, 1, 2)
-    
+
     return random_walk
-        
+
+
 def sine_wave(num_batches, batch_size, num_frames):
     num_frames_total = num_batches * batch_size * num_frames
     sine_wave = numpy.zeros((num_frames_total), dtype=numpy.float32)
-    for i in range(0,num_frames_total):
-        sine_wave[i] = 0.5 * numpy.sin(2*numpy.pi * i / 30.0) + 0.5
-        
+    for i in range(0, num_frames_total):
+        sine_wave[i] = 0.5 * numpy.sin(2 * numpy.pi * i / 30.0) + 0.5
+
     sine_wave = sine_wave.reshape((num_batches * batch_size, num_frames))
     sine_wave[1:] = sine_wave[numpy.random.permutation(sine_wave.shape[0] - 1) + 1]
-    
+
     sine_wave = sine_wave.reshape((num_batches, batch_size, num_frames, 1))
-    
+
     sine_wave = numpy.swapaxes(sine_wave, 1, 2)
-    
+
     return sine_wave

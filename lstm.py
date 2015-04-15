@@ -14,7 +14,8 @@ from blocks.bricks.recurrent import LSTM
 from blocks.bricks import Tanh, Linear, Sigmoid
 from blocks.graph import ComputationGraph
 from blocks.bricks.cost import SquaredError
-from blocks.algorithms import GradientDescent, Scale, CompositeRule, StepClipping
+from blocks.algorithms import (GradientDescent, Scale,
+                               CompositeRule, StepClipping)
 from blocks.extensions import FinishAfter, Printing
 from blocks.extensions.monitoring import TrainingDataMonitoring
 from blocks.main_loop import MainLoop
@@ -31,13 +32,13 @@ from datasets import single_bouncing_ball, save_as_gif
 floatX = theano.config.floatX
 
 # Parameters
-n_u = 225 # input vector size (not time at this point)
-n_y = 225 # output vector size
-n_h = 400 # numer of hidden units
-time_steps = 50 # number of time-steps in time
-n_seq = 200 # number of sequences for training
-iteration = 100 # number of epochs of gradient descent
-lr = 0.2 # learning rate
+n_u = 225  # input vector size (not time at this point)
+n_y = 225  # output vector size
+n_h = 400  # numer of hidden units
+time_steps = 50  # number of time-steps in time
+n_seq = 200  # number of sequences for training
+iteration = 100  # number of epochs of gradient descent
+lr = 0.2  # learning rate
 
 print "Building Model"
 # Symbolic variables
@@ -45,9 +46,9 @@ x = tensor.tensor3('x', dtype=floatX)
 target = tensor.tensor3('target', dtype=floatX)
 
 # Build the model
-linear = Linear(input_dim = n_u, output_dim = 4 * n_h, name="first_layer")
+linear = Linear(input_dim=n_u, output_dim=4 * n_h, name="first_layer")
 lstm = LSTM(dim=n_h, activation=Tanh())
-linear2 = Linear(input_dim = n_h, output_dim = n_y, name="output_layer")
+linear2 = Linear(input_dim=n_h, output_dim=n_y, name="output_layer")
 sigm = Sigmoid()
 
 x_transform = linear.apply(x)
@@ -57,14 +58,14 @@ predict = sigm.apply(linear2.apply(h))
 
 # only for generation B x h_dim
 h_initial = tensor.tensor3('h_initial', dtype=floatX)
-h_testing= lstm.apply(x_transform, states=h_initial ,iterate=False)[0]
+h_testing = lstm.apply(x_transform, states=h_initial, iterate=False)[0]
 y_hat_testing = linear2.apply(h_testing)
 y_hat_testing = sigm.apply(y_hat_testing)
 y_hat_testing.name = 'y_hat_testing'
 
 
 # Cost function
-cost = SquaredError().apply(predict,target)
+cost = SquaredError().apply(predict, target)
 
 # Initialization
 for brick in (lstm, linear, linear2):
@@ -77,7 +78,10 @@ cg = ComputationGraph(cost)
 print(VariableFilter(roles=[WEIGHT, BIAS])(cg.variables))
 
 # Training process
-algorithm = GradientDescent(cost=cost, params=cg.parameters, step_rule=CompositeRule([StepClipping(10.0),Scale(4)]))
+algorithm = GradientDescent(cost=cost,
+                            params=cg.parameters,
+                            step_rule=CompositeRule([StepClipping(10.0),
+                                                     Scale(4)]))
 monitor_cost = TrainingDataMonitoring([cost], prefix="train", after_epoch=True)
 
 print "Model built"
@@ -89,9 +93,9 @@ print "Model built"
 
 # Build input and output
 
-inputs = single_bouncing_ball(10,10,200,15,2)
+inputs = single_bouncing_ball(10, 10, 200, 15, 2)
 
-outputs = np.zeros(inputs.shape, dtype = floatX)
+outputs = np.zeros(inputs.shape, dtype=floatX)
 outputs[:, 0:-1, :, :] = inputs[:, 1:, :, :]
 
 
@@ -103,7 +107,12 @@ dataset = IterableDataset({'x': inputs, 'target': outputs})
 stream = DataStream(dataset)
 
 model = Model(cost)
-main_loop = MainLoop(data_stream=stream, algorithm=algorithm, extensions=[monitor_cost, FinishAfter(after_n_epochs=iteration), Printing()], model=model)
+main_loop = MainLoop(data_stream=stream,
+                     algorithm=algorithm,
+                     extensions=[monitor_cost,
+                                 FinishAfter(after_n_epochs=iteration),
+                                 Printing()],
+                     model=model)
 
 print 'Starting training ...'
 main_loop.run()
@@ -132,5 +141,5 @@ for i in range(200):
 print generated_seq.shape
 save_as_gif(generated_seq.reshape(generated_seq.shape[0],
                                   np.sqrt(generated_seq.shape[1]),
-                                  np.sqrt(generated_seq.shape[1])), "results/lstm.gif")
-                                  
+                                  np.sqrt(generated_seq.shape[1])),
+            "results/lstm.gif")
